@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+.venv
+
+# Daten
+*.csv
+data/*.csv
+
+# Sonstiges
+.DS_Store
