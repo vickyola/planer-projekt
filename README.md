@@ -29,7 +29,7 @@ Dieses Projekt ist ein einfacher Wochenplaner mit Drag & Drop, Filterung und Sta
 
 ```bash
 # Repository klonen
-git clone https://github.com/dein-nutzername/planer-projekt.git
+git clone https://github.com/vickyola/planer-projekt.git
 cd planer-projekt
 
 # Virtuelle Umgebung (optional aber empfohlen)
