@@ -1,0 +1,20 @@
+ID,Datum,Uhrzeit,slot,Verantwortliche,Kategorie,Prioritaet,Inhalt,Status
+task-00001,2025-07-06,08:00,0800,Anna,Bildung,hoch,Zimmer aufräumen,In Arbeit
+task-00002,2025-07-02,14:00,1400,Clara,Haushalt,mittel,Zimmer aufräumen,Erledigt
+task-00004,2025-07-06,10:00,1000,Anna,Einkaufen,mittel,Mathe lernen,Geplant
+task-00005,2025-06-30,08:30,0830,David,Einkaufen,mittel,Bericht schreiben,In Arbeit
+task-00006,2025-07-06,14:00,1400,Anna,Haushalt,niedrig,Zimmer aufräumen,In Arbeit
+task-00007,2025-07-03,10:00,1000,David,Freizeit,niedrig,Mathe lernen,Erledigt
+task-00008,2025-07-01,09:00,0900,Clara,Einkaufen,mittel,Zimmer aufräumen,Erledigt
+task-00009,2025-06-30,10:00,1000,Clara,Freizeit,hoch,Bericht schreiben,Geplant
+task-00010,2025-07-01,08:30,0830,Clara,Haushalt,mittel,Zimmer aufräumen,Geplant
+task-00011,2025-07-02,12:00,1200,Anna,Einkaufen,mittel,Mathe lernen,In Arbeit
+task-00012,2025-07-05,10:00,1000,Ben,Einkaufen,hoch,Reparatur erledigen,Geplant
+task-00013,2025-07-06,09:00,0900,Ben,Freizeit,mittel,Zimmer aufräumen,In Arbeit
+task-00014,2025-07-01,12:00,1200,David,Freizeit,mittel,Bericht schreiben,Geplant
+task-00015,2025-06-30,17:30,1730,Clara,Haushalt,niedrig,Bericht schreiben,Erledigt
+task-00016,2025-07-03,10:00,1000,Ben,Bildung,mittel,Joggen im Park,Erledigt
+task-00017,2025-07-04,08:30,0830,Anna,Wohnen,niedrig,Joggen im Park,Geplant
+task-00018,2025-07-05,09:00,0900,Clara,Einkaufen,niedrig,Joggen im Park,In Arbeit
+task-00019,2025-07-04,10:00,1000,David,Bildung,hoch,Reparatur erledigen,Geplant
+task-00020,2025-07-04,10:00,1000,David,Bildung,niedrig,Zimmer aufräumen,Erledigt

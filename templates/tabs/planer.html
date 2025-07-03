@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+    <title>{{ title }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: "Segoe UI", sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+
+        /* Button */
+        button {
+            font-family: "Segoe UI", sans-serif;
+            padding: 8px 14px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        /* Stil für den "+ Neue Aufgabe erstellen"-Button */
+        #newTaskButton {
+            background-color: #28a745;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        #newTaskButton:hover {
+            background-color: #218838;
+        }
+
+        /* Stil für die Navigationsbuttons */
+        .nav-button {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .nav-button:hover {
+            background-color: #0056b3;
+        }
+
+
+        /* Calender */
+        .calendar {
+            display: grid;
+            grid-template-columns: 100px repeat(7, 1fr);
+            gap: 1px;
+            background: #dee2e6;
+        }
+
+        .header,
+        .slot,
+        .cell {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 8px;
+            min-height: 100px;
+            box-sizing: border-box;
+        }
+
+        .header {
+            background: #e9ecef;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1.1em;
+            padding: 10px 5px;
+        }
+
+        .time-label {
+            background: #f1f3f5;
+            text-align: right;
+            padding-right: 8px;
+            font-weight: bold;
+            font-size: 0.95em;
+            color: #495057;
+        }
+
+        /* ---------- Status-Rahmen ---------- */
+        .task[data-status="Geplant"] {
+            border: 3px solid #3b904e;
+        }
+
+        .task[data-status="In Arbeit"] {
+            border: 3px solid #ffc107;
+        }
+
+        .task[data-status="Erledigt"] {
+            border: 3px solid #9a8f8f;
+        }
+
+
+        /* ---------- TASK-BASISSTIL ---------- */
+        .task {
+            padding: 10px;
+            margin: 6px 0;
+            border-radius: 6px;
+            font-size: 1em;
+            line-height: 1.4;
+            background: #ffffff;
+            cursor: grab;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+        }
+
+        .task:hover {
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .task strong {
+            display: block;
+            font-size: 1.05em;
+            margin-bottom: 4px;
+            color: #212529;
+        }
+
+        .task small {
+            font-size: 0.85em;
+            color: #495057;
+        }
+
+        /* Canvas charts */
+        canvas {
+            display: block;
+            margin: 0 auto;
+            width: 100% !important;
+            max-width: 500px;
+        }
+
+        /* Hintergrundfarbe je nach Priorität */
+        .task[data-prioritaet="hoch"] {
+            background-color: #ffcccc;
+            /* rotrosa */
+        }
+
+        .task[data-prioritaet="mittel"] {
+            background-color: #fff3cd;
+            /* hellgelb */
+        }
+
+        .task[data-prioritaet="niedrig"] {
+            background-color: #d4edda;
+            /* hellgrün */
+        }
+    </style>
+
+</head>
+
+<body>
+    <h1>Projektplaner – Woche ab {{ week_dates[0] }}</h1>
+    <div id="chartSection"
+        style="max-width: 1000px; margin: 40px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <h2 style="text-align: center;">Statistik der Woche {{ week_dates[0] }} - {{ week_dates[6] }} </h2>
+        <canvas id="themenChart"></canvas>
+
+    </div>
+
+    <button id="newTaskButton">+ Neue Aufgabe erstellen</button>
+
+    <div style="margin-bottom: 20px; display: flex; justify-content: space-between;">
+        <button onclick="navigateWeek(-1)" class="nav-button">← Vorherige Woche</button>
+        <button onclick="navigateWeek(1)" class="nav-button">Nächste Woche →</button>
+    </div>
+
+    <!-- Filter -->
+    <div id="taskFilter" style="margin-bottom: 20px; display: flex; gap: 10px;">
+        <select id="filterVerantwortliche">
+            <option value="">Alle Verantwortlicheen</option>
+        </select>
+
+        <select id="filterPrioritaet">
+            <option value="">Alle Prioritaeten</option>
+        </select>
+
+        <select id="filterKategorie">
+            <option value="">Alle Themen</option>
+        </select>
+
+    </div>
+
+
+    <!-- Calender -->
+    <div class="calendar">
+        <!-- Header row (days) -->
+        <div class="header"></div>
+        {% for date in week_dates %}
+        <div class="header">{{ date }}</div>
+        {% endfor %}
+
+        <!-- Time rows -->
+        {% for hour in range(8, 18) %}
+        {% for minute in (0, 30) %}
+        {% set slot = "%02d%02d"|format(hour, minute) %}
+        <div class="time-label">{{ "%02d:%02d"|format(hour, minute) }}</div>
+        {% for date in week_dates %}
+        {% set parts = date.split('.') %}
+        <div class="cell" data-date="{{ parts[2] }}-{{ parts[1] }}-{{ parts[0] }}" data-slot="{{ slot }}">
+            {% for task in tasks if task.PartitionKey == week_dates[loop.index0] and task.slot == slot %}
+            <div class="task" draggable="true" data-id="{{ task.ID }}" data-status="{{ task.Status }}"
+                data-prioritaet="{{ task.Prioritaet|lower }}" data-topic="{{ task.Kategorie }}"
+                data-verantwortliche="{{ task.Verantwortliche }}" data-date="{{ date }}" data-slot="{{ slot }}"
+                data-inhalt="{{ task.Inhalt }}">
+
+
+                <p><strong>{{ task.Kategorie }}</strong></p>
+                <p>{{ task.Verantwortliche }} <br> ( {{ task.Prioritaet }})</p>
+
+                <br> {{ task.Inhalt }}
+
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% endfor %}
+        {% endfor %}
+
+
+
+        <!-- Modal -->
+        <div id="taskModal" style="display: none; position: fixed; top: 10%; left: 50%; transform: translateX(-50%);
+     background: white; padding: 20px; border: 1px solid #ccc; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000;">
+            <h3>Task bearbeiten</h3>
+            <form id="editTaskForm">
+                <input type="hidden" id="modal-task-id">
+                <div>
+                    <label>Datum:</label><br>
+                    <input type="date" id="modal-datum">
+                </div>
+                <div>
+                    <label>Uhrzeit:</label><br>
+                    <input type="time" id="modal-zeit">
+                </div>
+                <div>
+                    <label>Inhalt:</label><br>
+                    <input type="text" id="modal-inhalt" style="width: 100%;">
+                </div>
+                <div>
+                    <label>Status:</label><br>
+                    <select id="modal-status">
+                        <option>Geplant</option>
+                        <option>In Arbeit</option>
+                        <option>Erledigt</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Kategorie:</label><br>
+                    <select id="modal-thema" style="width: 100%;" onchange="toggleCustomKategorie()"></select>
+                    <input type="text" id="modal-kategorie-custom" style="width: 100%; margin-top: 8px; display: none;"
+                        placeholder="Kategorie eingeben">
+                </div>
+                <div>
+                    <label>Prioritaet:</label><br>
+
+                    <select id="modal-prio">
+                        <option value="hoch">Hoch</option>
+                        <option value="mittel">Mittel</option>
+                        <option value="niedrig">Niedrig</option>
+                    </select>
+                </div>
+
+
+                <div>
+                    <label>Verantwortliche:</label><br>
+                    <select id="modal-Verantwortliche-select" style="width: 100%;"
+                        onchange="toggleCustomVerantwortliche()"></select>
+
+                    <input type="text" id="modal-Verantwortliche-custom"
+                        style="width: 100%; margin-top: 8px; display: none;" placeholder="Name eingeben">
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <button type="submit">Speichern</button>
+                    <button type="button" onclick="closeModal()">Abbrechen</button>
+                    <button type="button" id="deleteTaskButton"
+                        style="background-color: #dc3545; color: white;">Löschen</button>
+
+                </div>
+            </form>
+
+        </div>
+
+
+        <script>
+            const codeKey = '{{ code_key }}';
+            const route = '{{ base_route }}';
+            const weekDates = JSON.parse('{{ week_dates | tojson }}');
+
+
+            function navigateWeek(offset) {
+                const params = new URLSearchParams(window.location.search);
+                const currentOffset = parseInt(params.get("week_offset") || "0");
+                const newOffset = currentOffset + offset;
+
+                params.set("week_offset", newOffset);
+
+
+                if (!params.get("code")) {
+                    params.set("code", codeKey);
+                }
+
+                // Browser navigiert zur neuen URL mit aktualisierten Parametern
+                window.location.href = `${window.location.pathname}?${params.toString()}`;
+            }
+
+            document.querySelectorAll('.task').forEach(task => {
+                task.addEventListener('dragstart', e => {
+                    e.dataTransfer.setData('text/plain', task.dataset.id);
+                    task.classList.add('dragging');
+                });
+                task.addEventListener('dragend', () => {
+                    task.classList.remove('dragging');
+                });
+            });
+
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.addEventListener('dragover', e => e.preventDefault());
+                cell.addEventListener('drop', async e => {
+                    e.preventDefault();
+
+                    const taskId = e.dataTransfer.getData('text/plain');
+                    const newDate = cell.dataset.date;
+                    const newSlot = cell.dataset.slot;
+
+                    const taskEl = document.querySelector(`.task[data-id="${taskId}"]`);
+                    if (!taskEl) {
+                        console.error("Task element not found in DOM.");
+                        return;
+                    }
+
+                    const response = await fetch(`/api/move-task`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-functions-key': codeKey
+                        },
+                        body: JSON.stringify({
+                            taskId,
+                            newDate,
+                            newSlot
+                        })
+                    });
+
+                    const responseText = await response.text();
+
+                    if (response.ok) {
+                        // Move DOM element
+                        cell.appendChild(taskEl);
+                        taskEl.classList.add("flash");
+                        setTimeout(() => taskEl.classList.remove("flash"), 1000);
+                        console.log(" Task moved successfully.");
+                    } else {
+                        console.error(" Fehler beim Speichern:", responseText);
+                        alert("Update fehlgeschlagen: " + responseText);
+                    }
+                });
+            });
+
+            // Modal
+            function populateModalOptions() {
+                const verantwortlicheSet = new Set();
+                const themenSet = new Set();
+                const prioritaetSet = new Set();
+
+
+                document.querySelectorAll(".task").forEach(task => {
+                    verantwortlicheSet.add(task.dataset.verantwortliche);
+                    themenSet.add(task.dataset.topic);
+                    prioritaetSet.add(task.dataset.prioritaet);
+
+                });
+
+                const themaSelect = document.getElementById("modal-thema");
+                const themaCustom = document.getElementById("modal-kategorie-custom");
+                if (!themaSelect || !themaCustom) return;
+
+                themaSelect.innerHTML = `<option value="">– bitte wählen –</option>`;
+                [...themenSet].sort().forEach(thema => {
+                    const opt = document.createElement("option");
+                    opt.value = thema;
+                    opt.textContent = thema;
+                    themaSelect.appendChild(opt);
+                });
+
+                const customThemaOpt = document.createElement("option");
+                customThemaOpt.value = "custom";
+                customThemaOpt.textContent = "Andere...";
+                themaSelect.appendChild(customThemaOpt);
+
+                // Verantwortliche
+                const verantwortlicheSelect = document.getElementById("modal-Verantwortliche-select");
+                const verantwortlicheCustom = document.getElementById("modal-Verantwortliche-custom");
+                if (!verantwortlicheSelect || !verantwortlicheCustom) return;
+
+                verantwortlicheSelect.innerHTML = `<option value="">– bitte wählen –</option>`;
+                [...verantwortlicheSet].sort().forEach(v => {
+                    const opt = document.createElement("option");
+                    opt.value = v;
+                    opt.textContent = v;
+                    verantwortlicheSelect.appendChild(opt);
+                });
+
+                const customVerantwortlicheOpt = document.createElement("option");
+                customVerantwortlicheOpt.value = "custom";
+                customVerantwortlicheOpt.textContent = "Andere...";
+                verantwortlicheSelect.appendChild(customVerantwortlicheOpt);
+
+                // Größe
+                const prioSelect = document.getElementById("modal-prio");
+                if (!prioSelect) return;
+
+                prioSelect.innerHTML = '';
+
+                if (prioritaetSet.size === 0) {
+                    // Fallback auf Standardoptionen
+                    ["hoch", "mittel", "niedrig"].forEach(p => {
+                        const opt = document.createElement("option");
+                        opt.value = p;
+                        opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+                        prioSelect.appendChild(opt);
+                    });
+                } else {
+                    [...prioritaetSet].sort().forEach(p => {
+                        const opt = document.createElement("option");
+                        opt.value = p;
+                        opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+                        prioSelect.appendChild(opt);
+                    });
+                }
+            }
+
+            function closeModal() {
+                document.getElementById("taskModal").style.display = "none";
+            }
+
+            let selectedTaskElement = null;
+            let selectedCell = null;
+
+            document.querySelectorAll('.task').forEach(task => {
+                task.addEventListener('click', () => {
+                    populateModalOptions();
+
+                    const Verantwortliche = task.dataset.verantwortliche || "Unbekannt";
+
+                    selectedTaskElement = task;
+                    const cell = task.closest('.cell');
+                    selectedCell = cell;
+
+                    const date = cell?.dataset.date;
+                    const slot = cell?.dataset.slot;
+
+
+                    if (date) document.getElementById("modal-datum").value = date;
+
+                    if (slot && slot.length === 4) {
+                        const hh = slot.substring(0, 2);
+                        const mm = slot.substring(2, 4);
+                        document.getElementById("modal-zeit").value = `${hh}:${mm}`;
+                    }
+                    document.getElementById("modal-task-id").value = task.dataset.id ?? "";
+                    document.getElementById("modal-inhalt").value = task.dataset.inhalt ?? "";
+
+
+                    document.getElementById("modal-status").value = task.dataset.status ?? "Geplant";
+                    document.getElementById("modal-thema").value = task.dataset.topic ?? "Wohnen";
+                    document.getElementById("modal-prio").value = task.dataset.prioritaet ?? "mittel";
+                    ;
+
+                    const VerantwortlicheSelect = document.getElementById("modal-Verantwortliche-select");
+                    const VerantwortlicheCustom = document.getElementById("modal-Verantwortliche-custom");
+
+                    if ([...VerantwortlicheSelect.options].some(option => option.value === Verantwortliche)) {
+                        VerantwortlicheSelect.value = Verantwortliche;
+                        VerantwortlicheCustom.style.display = "none";
+                        VerantwortlicheCustom.value = "";
+                    } else {
+                        VerantwortlicheSelect.value = "custom";
+                        VerantwortlicheCustom.style.display = "inline-block";
+                        VerantwortlicheCustom.value = Verantwortliche;
+                    } document.getElementById("taskModal").style.display = "block";
+                });
+            });
+
+            document.getElementById("editTaskForm").addEventListener("submit", async function (e) {
+                e.preventDefault();
+
+                const taskId = document.getElementById("modal-task-id").value.trim();
+                const isNew = taskId === "";
+
+                // Daten erfassen
+                const data = {
+                    taskId: taskId,
+                    Inhalt: document.getElementById("modal-inhalt").value,
+                    Status: document.getElementById("modal-status").value,
+                    Kategorie: document.getElementById("modal-thema").value,
+                    Prioritaet: document.getElementById("modal-prio").value,
+                };
+                const Verantwortliche =
+                    document.getElementById("modal-Verantwortliche-select").value === "custom"
+                        ? document.getElementById("modal-Verantwortliche-custom").value
+                        : document.getElementById("modal-Verantwortliche-select").value;
+                data.Verantwortliche = Verantwortliche;
+
+
+
+                // Nur beim Neuanlegen: Datum + Uhrzeit einfügen
+                if (isNew) {
+                    data.Datum = document.getElementById("modal-datum").value;
+                    data.Uhrzeit = document.getElementById("modal-zeit").value;
+                }
+
+                const url = isNew ? "/api/create-task" : "/api/update-task";
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-functions-key': codeKey
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    const responseText = await response.text();
+
+                    if (!response.ok) {
+                        throw new Error(responseText);
+                    }
+
+                    closeModal();
+                    if (!isNew && selectedTaskElement) {
+                        selectedTaskElement.dataset.status = data.Status;
+                        selectedTaskElement.dataset.topic = data.Kategorie;
+                        selectedTaskElement.dataset.prioritaet = data.Prioritaet;
+                        selectedTaskElement.dataset.verantwortliche = data.Verantwortliche;
+                        selectedTaskElement.dataset.inhalt = data.Inhalt;
+
+                        selectedTaskElement.innerHTML = `
+        <p><strong>${data.Kategorie}</strong></p>
+        <p>${data.Verantwortliche} (${data.Prioritaet})</p>
+        <br>${data.Inhalt}`;
+
+                        selectedTaskElement.classList.add("flash");
+                        setTimeout(() => {
+                            selectedTaskElement.classList.remove("flash");
+                            applyTaskFilters(); // ← WICHTIG!
+                        }, 1000);
+                    } else {
+                        location.reload(); // bei Neuerstellung
+                    }
+
+                } catch (error) {
+                    alert("Fehler beim Speichern: " + error.message);
+                    console.error(" Fehler beim Speichern:", error);
+                }
+            });
+
+            // "Neue Aufgabe erstellen" Button Logic
+            document.getElementById("newTaskButton").addEventListener("click", () => {
+                populateModalOptions();
+                selectedTaskElement = null;
+                selectedCell = null;
+
+                document.getElementById("modal-task-id").value = "";
+                document.getElementById("modal-inhalt").value = "";
+                document.getElementById("modal-status").value = "Geplant";
+                document.getElementById("modal-thema").value = "Wohnen";
+                document.getElementById("modal-prio").value = "mittel";
+
+                document.getElementById("modal-Verantwortliche-select").value = "";
+                document.getElementById("modal-Verantwortliche-custom").value = "";
+                document.getElementById("modal-Verantwortliche-custom").style.display = "none";
+
+                const morgen = new Date();
+                morgen.setDate(morgen.getDate() + 1);
+                const yyyy_mm_dd = morgen.toISOString().split('T')[0];
+                document.getElementById("modal-datum").value = yyyy_mm_dd;
+                document.getElementById("modal-zeit").value = "08:00";
+
+                document.getElementById("taskModal").style.display = "block";
+            });
+
+            // Verantwortliche custom 
+
+            function toggleCustomVerantwortliche() {
+                const select = document.getElementById("modal-Verantwortliche-select");
+                const customInput = document.getElementById("modal-Verantwortliche-custom");
+                customInput.style.display = select.value === "custom" ? "block" : "none";
+            }
+
+            // Kategorie custom
+            function toggleCustomKategorie() {
+                const select = document.getElementById("modal-thema");
+                const customInput = document.getElementById("modal-kategorie-custom");
+                customInput.style.display = select.value === "custom" ? "block" : "none";
+            }
+
+            // Charts
+
+            async function fetchWeeklyStats() {
+
+                const response = await fetch(`/api/taskstat/week`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-functions-key": codeKey
+                    },
+                    body: JSON.stringify({ "week_dates": weekDates })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    renderCharts(data);
+                } else {
+                    const errorText = await response.text();
+                    console.error("Statistik-Fehler:", errorText);
+                    alert("Fehler beim Laden der Statistik: " + errorText);
+                }
+
+            }
+
+
+            function getTopicColors(topics) {
+                const colorMap = {
+                    "Wohnen": "#2be670",
+                    "Politik": "#7a7a7a",
+                    "Familie": "#ffb01d",
+                    "Gastro": "#ffea00",
+                    "Einkaufen": "#ae0cc3",
+                    "Verkehr": "#d2091a",
+                    "Wirtschaft": "#34ccfa",
+                    "Blaulicht": "#0a1871",
+                    "Bildung": "#6f4343",
+                    "Freizeit": "#f1629e",
+                };
+
+                return topics.map(topic => {
+                    if (colorMap[topic]) return colorMap[topic];
+
+                    const el = document.querySelector(`.task[data-topic="${topic}"]`);
+                    return el ? getComputedStyle(el).backgroundColor : "#ccc";
+                });
+            }
+
+
+
+            let themenChart = null;
+
+
+            function renderCharts(data) { // Themen & Anzahl
+                const topics = Object.keys(data.themenverteilung);
+                const counts = Object.values(data.themenverteilung);
+
+                // Erfüllungsgrad je Thema
+                const topicPercents = topics.map(topic =>
+                    data.topic_load?.[topic]?.percent ?? 0
+                );
+                themenChart = new Chart(document.getElementById("themenChart"), {
+                    type: "pie",
+                    data: {
+                        labels: topics, // Normale Labels für das Diagramm
+                        datasets: [{
+                            label: "Themenverteilung",
+                            data: counts, // echte Verteilung
+                            backgroundColor: getTopicColors(topics)
+
+                            // backgroundColor: ['#4dabf7', '#ffd43b', '#69db7c', '#ffa8a8', '#b2f2bb', '#ffd8a8']
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: "bottom",
+                                labels: {
+                                    font: { size: 14 },
+                                    generateLabels: chart => {
+                                        const { data } = chart;
+                                        return data.labels.map((label, i) => {
+                                            const percent = topicPercents[i] ?? 0;
+                                            return {
+                                                text: `${label} (${percent}%)`,
+                                                fillStyle: data.datasets[0].backgroundColor[i],
+                                                strokeStyle: "#fff",
+                                                lineWidth: 1,
+                                                hidden: false,
+                                                index: i
+                                            };
+                                        });
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => {
+                                        const topic = ctx.label;
+                                        const value = ctx.raw;
+                                        const percent = topicPercents[ctx.dataIndex] ?? 0;
+                                        return `${topic}: ${value} Aufgaben – ${percent}% erfüllt`;
+                                    }
+                                }
+                            }
+                        },
+                        animation: false,
+                        maintainAspectRatio: true
+                    }
+                });
+            }
+
+
+            // Filter 
+            function populateFilterOptions() {
+                const verantwortlicheSelect = document.getElementById("filterVerantwortliche");
+                const prioritaetSelect = document.getElementById("filterPrioritaet");
+                const kategorieSelect = document.getElementById("filterKategorie");
+
+                const verantwortlicheSet = new Set();
+                const prioritaeten = new Set();
+                const kategorien = new Set();
+
+                document.querySelectorAll(".task").forEach(task => {
+                    verantwortlicheSet.add(task.dataset.verantwortliche);
+                    prioritaeten.add(task.dataset.prioritaet);
+                    kategorien.add(task.dataset.topic);
+                });
+
+                // Verantwortliche
+                verantwortlicheSelect.innerHTML = '<option value="">Alle Verantwortlichen</option>';
+                [...verantwortlicheSet].sort().forEach(name => {
+                    const opt = document.createElement("option");
+                    opt.value = name;
+                    opt.textContent = name;
+                    verantwortlicheSelect.appendChild(opt);
+                });
+
+                // Prioritaeten
+                prioritaetSelect.innerHTML = '<option value="">Alle Prioritaeten</option>';
+                [...prioritaeten].sort().forEach(prio => {
+                    const opt = document.createElement("option");
+                    opt.value = prio.toLowerCase();;
+                    opt.textContent = prio.charAt(0).toUpperCase() + prio.slice(1);
+                    prioritaetSelect.appendChild(opt);
+                });
+
+                // Kategorien
+                kategorieSelect.innerHTML = '<option value="">Alle Themen</option>';
+                [...kategorien].sort().forEach(kat => {
+                    const opt = document.createElement("option");
+                    opt.value = kat;
+                    opt.textContent = kat;
+                    kategorieSelect.appendChild(opt);
+                });
+            }
+
+            function applyTaskFilters() {
+                const selectedVerantwortliche = document.getElementById("filterVerantwortliche").value;
+                const selectedPrioritaet = document.getElementById("filterPrioritaet").value;
+                const selectedKategorie = document.getElementById("filterKategorie").value;
+
+                document.querySelectorAll(".task").forEach(task => {
+                    const verantwortliche = task.dataset.verantwortliche;
+                    const prioritaet = task.dataset.prioritaet;
+                    const kategorie = task.dataset.topic;
+                    const matchVerantwortliche = !selectedVerantwortliche || verantwortliche === selectedVerantwortliche;
+                    const matchPrioritaet = !selectedPrioritaet || prioritaet === selectedPrioritaet;
+                    const matchKategorie = !selectedKategorie || kategorie === selectedKategorie;
+                    const visible = matchVerantwortliche && matchPrioritaet && matchKategorie;
+                    task.style.display = visible ? "block" : "none";
+                });
+            }
+
+            window.addEventListener("DOMContentLoaded", () => {
+                populateFilterOptions();
+
+
+                // Filter aktivieren
+                document.getElementById("filterVerantwortliche").addEventListener("change", applyTaskFilters);
+                document.getElementById("filterPrioritaet").addEventListener("change", applyTaskFilters);
+                document.getElementById("filterKategorie").addEventListener("change", applyTaskFilters);
+                // Statistik beim Laden der Seite laden
+                fetchWeeklyStats();
+
+
+            });
+
+            // Löschen
+            document.getElementById("deleteTaskButton").addEventListener("click", async () => {
+                const taskId = document.getElementById("modal-task-id").value.trim();
+                if (!taskId) return;
+
+                if (!confirm("Möchtest du diese Aufgabe wirklich löschen?")) return;
+
+                try {
+                    const response = await fetch("/api/delete-task", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "x-functions-key": codeKey
+                        },
+                        body: JSON.stringify({ taskId })
+                    });
+
+                    const responseText = await response.text();
+
+                    if (!response.ok) {
+                        throw new Error(responseText);
+                    }
+
+                    // DOM-Element entfernen
+                    if (selectedTaskElement) {
+                        selectedTaskElement.remove();
+                    }
+
+                    closeModal();
+                    applyTaskFilters();
+                } catch (error) {
+                    alert("Fehler beim Löschen: " + error.message);
+                    console.error("Löschfehler:", error);
+                }
+            });
+
+
+
+        </script>
+
+</body>
+
+</html>
